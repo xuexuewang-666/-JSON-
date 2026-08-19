@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>JSON专业配置工具 | 结构清理 + 批量导入/导出CSV + 可视化填充 + 独立校验</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #e2e8f0;
+            font-family: 'Inter', 'Segoe UI', system-ui, monospace;
+            padding: 1rem;
+            min-height: 100vh;
+        }
+
+        .app {
+            max-width: 1800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .toolbar {
+            background: #1e2f3f;
+            padding: 0.7rem 1.2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            align-items: center;
+            border-bottom: 1px solid #2c4458;
+        }
+
+        .toolbar-group {
+            display: flex;
+            gap: 0.5rem;
+            background: #2a3f52;
+            padding: 0.25rem 0.8rem;
+            border-radius: 40px;
+            align-items: center;
+        }
+
+        .toolbar-group label {
+            color: #cbdbe6;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        button, .file-label, .csv-btn {
+            background: #2c5a7a;
+            border: none;
+            padding: 0.35rem 0.9rem;
+            border-radius: 2rem;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: white;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        button:hover, .csv-btn:hover {
+            background: #1e4562;
+            transform: translateY(-1px);
+        }
+
+        button.secondary {
+            background: #4a627a;
+        }
+        button.secondary:hover { background: #3a4f66; }
+        button.outline {
+            background: transparent;
+            border: 1px solid #6c8dae;
+            color: #cbdbe6;
+        }
+        button.outline:hover { background: #2a3f52; color: white; }
+        select, input[type="number"] {
+            background: #1e2f3f;
+            border: 1px solid #4a6f8a;
+            border-radius: 1rem;
+            padding: 0.25rem 0.6rem;
+            color: white;
+            font-size: 0.7rem;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f1f5f9;
+            border-bottom: 1px solid #dce5ef;
+            padding: 0 1.5rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 0.7rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #4a627a;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        .tab-btn.active {
+            color: #1e4562;
+            border-bottom-color: #2c5a7a;
+        }
+        .tab-content {
+            display: none;
+            padding: 1.2rem;
+            background: #ffffff;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        .compare-container {
+            display: flex;
+            gap: 1px;
+            background: #d4dee8;
+            min-height: 55vh;
+        }
+        .editor-panel {
+            flex: 1;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .panel-header {
+            background: #f8fafd;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+            font-size: 0.8rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .code-wrapper {
+            display: flex;
+            overflow: auto;
+            flex: 1;
+        }
+        .line-numbers {
+            background: #f8fafc;
+            color: #8a9bb0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            line-height: 1.5;
+            padding: 0.8rem 0.5rem;
+            text-align: right;
+            user-select: none;
+            border-right: 1px solid #e2edf2;
+            min-width: 2.5rem;
+        }
+        .code-area {
+            flex: 1;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            line-height: 1.5;
+            background: #ffffff;
+            padding: 0.8rem;
+            white-space: pre-wrap;
+            overflow: auto;
+            outline: none;
+        }
+        .diff-added { background-color: #e6ffec; border-left: 3px solid #2c9b5e; }
+        .diff-removed { background-color: #ffeef0; border-left: 3px solid #e5484d; }
+        .diff-changed { background-color: #fff5e0; border-left: 3px solid #f5a623; }
+
+        .ad-card {
+            background: #f9fbfe;
+            border: 1px solid #e2edf2;
+            border-radius: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+        }
+        .card-title {
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: #1e3a4b;
+            border-left: 4px solid #2c5a7a;
+            padding-left: 0.7rem;
+        }
+        .source-row {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-top: 0.6rem;
+            flex-wrap: wrap;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 0.8rem;
+        }
+        .source-badge {
+            min-width: 140px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+        .source-row input {
+            flex: 2;
+            min-width: 200px;
+            padding: 0.4rem;
+            border-radius: 1rem;
+            border: 1px solid #cbdee9;
+            font-family: monospace;
+        }
+        .csv-note {
+            font-size: 0.7rem;
+            background: #f0f4f9;
+            padding: 0.6rem;
+            border-radius: 0.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .status-bar {
+            background: #f1f5f9;
+            padding: 0.3rem 1rem;
+            font-size: 0.7rem;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid #e2e8f0;
+        }
+        .toastmsg {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e2f3f;
+            color: white;
+            padding: 0.4rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.75rem;
+            z-index: 2000;
+            opacity: 0;
+            transition: 0.2s;
+            pointer-events: none;
+        }
+
+        /* 校验 JSON 行号容器 */
+        .validate-json-container {
+            display: flex;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.8rem;
+            overflow: hidden;
+            min-height: 350px;
+            background: white;
+        }
+        .validate-line-numbers {
+            background: #f8fafc;
+            color: #8a9bb0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            padding: 0.8rem 0.5rem;
+            text-align: right;
+            user-select: none;
+            border-right: 1px solid #e2edf2;
+            min-width: 2.8rem;
+        }
+        .validate-json-textarea {
+            flex: 1;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            padding: 0.8rem;
+            border: none;
+            resize: vertical;
+            outline: none;
+            white-space: pre-wrap;
+            overflow: auto;
+        }
+        .validate-panel {
+            display: flex;
+            gap: 1.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        .validate-json-area {
+            flex: 2;
+            min-width: 300px;
+        }
+        .validate-actions {
+            flex: 1;
+            min-width: 250px;
+        }
+        .validate-output {
+            background: #1e2f3f;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.8rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow: auto;
+            margin-top: 1rem;
+        }
+        .script-status {
+            font-size: 0.7rem;
+            color: #4a627a;
+            margin-top: 0.5rem;
+        }
+
+        @media (max-width: 700px) {
+            .toolbar-group { flex-wrap: wrap; }
+            .source-row { flex-direction: column; align-items: flex-start; }
+            .validate-panel { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="toolbar">
+        <div class="toolbar-group"><button id="processCleanBtn">✨ 1. 结构清理+排序</button></div>
+        <div class="toolbar-group">
+            <span>缩进</span>
+            <select id="indentSize"><option value="2">2空格</option><option value="4" selected>4空格</option><option value="0">紧凑</option></select>
+            <button id="formatJsonBtn" class="outline">🎨 格式化左侧</button>
+            <button id="formatRightBtn" class="outline">🎨 格式化右侧</button>
+        </div>
+        <div class="toolbar-group">
+            <input type="file" id="jsonFileInput" accept=".json" style="display:none">
+            <button id="loadJsonBtn">📂 加载JSON</button>
+            <button id="exportJsonBtn">💾 导出JSON</button>
+        </div>
+        <div class="toolbar-group">
+            <button id="toggleSyncBtn" style="background:#2c5a7a;">🔗 同步滚动开</button>
+            <button id="diffHighlightBtn" class="outline">🔍 差异高亮</button>
+        </div>
+        <div class="toolbar-group">
+            <span id="statsLabel" style="color:#bbd4f0;">就绪</span>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="json">📄 JSON对比/编辑</button>
+        <button class="tab-btn" data-tab="visual">🎛️ 可视化填值(按ID)</button>
+        <button class="tab-btn" data-tab="csv">📊 批量导入/导出CSV</button>
+        <button class="tab-btn" data-tab="validate">✅ JSON校验</button>
+    </div>
+
+    <div id="tab-json" class="tab-content active">
+        <div class="compare-container">
+            <div class="editor-panel">
+                <div class="panel-header"><span>📥 原始JSON (可编辑)</span><span id="leftStat"></span></div>
+                <div class="code-wrapper" id="leftWrap"><div class="line-numbers" id="leftLines"></div><div class="code-area" id="leftEditor" contenteditable="true" spellcheck="false">{"version":2,"ids":[]}</div></div>
+            </div>
+            <div class="editor-panel">
+                <div class="panel-header"><span>📤 处理后 (可编辑)</span><span id="rightStat"></span></div>
+                <div class="code-wrapper" id="rightWrap"><div class="line-numbers" id="rightLines"></div><div class="code-area" id="rightEditor" contenteditable="true" spellcheck="false">// 点击「结构清理+排序」</div></div>
+            </div>
+        </div>
+        <div class="status-bar"><span>✅ 清理逻辑: ids内所有value→"" | 将ids中id移至顶部 | ad_positions中ad_id移至顶部</span><span id="diffStatus">差异: 手动查看</span></div>
+    </div>
+
+    <div id="tab-visual" class="tab-content">
+        <div style="margin-bottom: 1rem; display: flex; gap: 0.8rem;">
+            <button id="refreshVisualBtn">🔄 从当前右侧JSON刷新表单</button>
+            <button id="applyVisualBtn">✏️ 应用表单值到右侧JSON</button>
+        </div>
+        <div id="visualContainer" style="max-height: 60vh; overflow-y: auto; padding-right: 0.5rem;">等待加载数据...</div>
+    </div>
+
+    <div id="tab-csv" class="tab-content">
+        <div class="csv-note">
+            📌 <strong>操作指南</strong>：点击「导出CSV模板」→ 在Excel中编辑 <code>new_value</code> 列 → 保存CSV → 点击「导入CSV并填充」→ 填充后点击「生成最终JSON更新到右侧」。
+        </div>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <button id="exportCsvBtn" class="secondary">📎 导出CSV模板 (空白)</button>
+            <input type="file" id="csvFileInput" accept=".csv" style="display:none">
+            <button id="importCsvBtn">📂 导入CSV并填充</button>
+            <button id="applyCsvToJsonBtn" class="secondary">✨ 将填充结果更新到右侧JSON</button>
+            <button id="resetFromRightBtn" class="outline">🔄 重置CSV视图(从右侧JSON同步)</button>
+        </div>
+        <div id="csvPreviewArea" style="font-family: monospace; font-size: 0.7rem; background:#f8fafd; padding: 1rem; border-radius: 1rem; max-height: 50vh; overflow: auto;">
+            等待导出或导入...
+        </div>
+    </div>
+
+    <!-- 独立 JSON 校验功能 -->
+    <div id="tab-validate" class="tab-content">
+        <div style="margin-bottom: 1rem;">
+            <h3 style="color: #1e3a4b;">✅ Python 校验脚本 (持久缓存)</h3>
+            <p class="script-status" id="scriptStatus">校验脚本：未上传</p>
+            <div style="display: flex; gap: 1rem; margin-top: 0.6rem;">
+                <button id="uploadScriptBtn">📤 上传校验脚本 (.py)</button>
+                <button id="clearScriptBtn" class="outline">🗑️ 清除缓存脚本</button>
+            </div>
+            <input type="file" id="scriptFileInput" accept=".py" style="display:none">
+        </div>
+        <div class="validate-panel">
+            <div class="validate-json-area">
+                <strong>📄 待校验 JSON</strong>
+                <div class="validate-json-container">
+                    <div class="validate-line-numbers" id="validateLineNumbers"></div>
+                    <textarea id="validateJsonText" class="validate-json-textarea" placeholder="在此粘贴 JSON 或使用下方按钮上传文件..."></textarea>
+                </div>
+                <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                    <input type="file" id="validateJsonFileInput" accept=".json" style="display:none">
+                    <button id="uploadValidateJsonBtn">📂 上传 JSON 文件</button>
+                    <button id="formatValidateJsonBtn" class="secondary">🎨 格式化</button>
+                    <button id="compressValidateJsonBtn" class="secondary">🗜️ 压缩</button>
+                    <button id="clearValidateJsonBtn" class="outline">🗑️ 清空</button>
+                </div>
+            </div>
+            <div class="validate-actions">
+                <div id="pyodideStatus" style="font-size:0.8rem; margin-bottom:0.8rem; color:#1e4562;">Pyodide 未加载</div>
+                <button id="runValidateBtn" style="width:100%; padding:0.7rem; font-size:0.9rem;" disabled>▶️ 开始校验</button>
+                <div id="validateOutput" class="validate-output" style="margin-top:1.5rem;">等待执行...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar"><span>💡 提示：每次修改后记得点击「应用」确保右侧JSON同步，之后再导出最终文件。</span></div>
+</div>
+<div id="toast" class="toastmsg"></div>
+
+<script>
+    (function(){
+        // ---------- 原有 DOM 元素 ----------
+        const leftEditor = document.getElementById('leftEditor');
+        const rightEditor = document.getElementById('rightEditor');
+        const leftLines = document.getElementById('leftLines');
+        const rightLines = document.getElementById('rightLines');
+        const processBtn = document.getElementById('processCleanBtn');
+        const formatLeftBtn = document.getElementById('formatJsonBtn');
+        const formatRightBtn = document.getElementById('formatRightBtn');
+        const indentSize = document.getElementById('indentSize');
+        const loadJsonBtn = document.getElementById('loadJsonBtn');
+        const jsonFileInput = document.getElementById('jsonFileInput');
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        const toggleSyncBtn = document.getElementById('toggleSyncBtn');
+        const diffBtn = document.getElementById('diffHighlightBtn');
+        const diffStatusSpan = document.getElementById('diffStatus');
+        const statsLabel = document.getElementById('statsLabel');
+        const visualContainer = document.getElementById('visualContainer');
+        const refreshVisualBtn = document.getElementById('refreshVisualBtn');
+        const applyVisualBtn = document.getElementById('applyVisualBtn');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+        const csvFileInput = document.getElementById('csvFileInput');
+        const importCsvBtn = document.getElementById('importCsvBtn');
+        const applyCsvToJsonBtn = document.getElementById('applyCsvToJsonBtn');
+        const resetFromRightBtn = document.getElementById('resetFromRightBtn');
+        const csvPreviewArea = document.getElementById('csvPreviewArea');
+
+        // ---------- 校验功能 DOM ----------
+        const uploadScriptBtn = document.getElementById('uploadScriptBtn');
+        const clearScriptBtn = document.getElementById('clearScriptBtn');
+        const scriptFileInput = document.getElementById('scriptFileInput');
+        const scriptStatus = document.getElementById('scriptStatus');
+        const validateJsonText = document.getElementById('validateJsonText');
+        const validateLineNumbers = document.getElementById('validateLineNumbers');
+        const uploadValidateJsonBtn = document.getElementById('uploadValidateJsonBtn');
+        const formatValidateJsonBtn = document.getElementById('formatValidateJsonBtn');
+        const compressValidateJsonBtn = document.getElementById('compressValidateJsonBtn');
+        const clearValidateJsonBtn = document.getElementById('clearValidateJsonBtn');
+        const validateJsonFileInput = document.getElementById('validateJsonFileInput');
+        const runValidateBtn = document.getElementById('runValidateBtn');
+        const validateOutput = document.getElementById('validateOutput');
+        const pyodideStatusDiv = document.getElementById('pyodideStatus');
+
+        let syncEnabled = true;
+        let currentRightJsonObj = null;
+        let cachedCsvData = [];
+        let pyodideReady = false;
+        let pyodideInstance = null;
+
+        function showToast(msg, isErr=false) {
+            const toast = document.getElementById('toast');
+            toast.style.opacity = '1';
+            toast.textContent = msg;
+            toast.style.background = isErr ? '#b91c1cd9' : '#1e2f3f';
+            setTimeout(() => toast.style.opacity = '0', 1800);
+        }
+
+        // ---------- 校验 JSON 行号更新 ----------
+        function updateValidateLineNumbers() {
+            const text = validateJsonText.value;
+            const lines = text.split('\n');
+            validateLineNumbers.innerHTML = Array.from({length: lines.length}, (_, i) => i+1).join('<br>');
+        }
+
+        // ---------- 原有工具函数 ----------
+        function updateLineNumbers(editor, lineContainer) {
+            const text = editor.innerText || editor.textContent || '';
+            const lines = text.split('\n');
+            lineContainer.innerHTML = Array.from({length: lines.length}, (_, i) => i+1).join('<br>');
+        }
+        function updateBothLineNumbers() {
+            updateLineNumbers(leftEditor, leftLines);
+            updateLineNumbers(rightEditor, rightLines);
+        }
+        function deepClearIdsValues(obj) {
+            if (!obj || typeof obj !== 'object') return obj;
+            if (Array.isArray(obj)) { obj.forEach(i => deepClearIdsValues(i)); return obj; }
+            for(let k in obj) {
+                if(k === 'value') obj[k] = "";
+                else deepClearIdsValues(obj[k]);
+            }
+            return obj;
+        }
+        function moveKeyToTop(obj, topKey) {
+            if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+            if (!(topKey in obj)) return obj;
+            const newOrder = {}; newOrder[topKey] = obj[topKey];
+            for(let k of Object.keys(obj)) if(k !== topKey) newOrder[k] = obj[k];
+            return newOrder;
+        }
+        function transformStructure(data) {
+            if (!data || typeof data !== 'object') return data;
+            const cloned = JSON.parse(JSON.stringify(data));
+            if (cloned.ids && Array.isArray(cloned.ids)) {
+                for(let i=0;i<cloned.ids.length;i++) {
+                    let item = cloned.ids[i];
+                    if(item && typeof item === 'object') {
+                        const withIdFirst = moveKeyToTop(item, 'id');
+                        cloned.ids[i] = withIdFirst;
+                        deepClearIdsValues(withIdFirst);
+                    }
+                }
+            }
+            if (cloned.ad_positions && Array.isArray(cloned.ad_positions)) {
+                for(let i=0;i<cloned.ad_positions.length;i++) {
+                    let pos = cloned.ad_positions[i];
+                    if(pos && typeof pos === 'object') cloned.ad_positions[i] = moveKeyToTop(pos, 'ad_id');
+                }
+            }
+            return cloned;
+        }
+        function getPretty(obj) {
+            const indent = indentSize.value === '0' ? 0 : parseInt(indentSize.value);
+            return indent === 0 ? JSON.stringify(obj) : JSON.stringify(obj, null, indent);
+        }
+        function updateRightCacheFromEditor() {
+            try {
+                const txt = rightEditor.innerText || rightEditor.textContent;
+                if(txt.trim()) currentRightJsonObj = JSON.parse(txt);
+                else currentRightJsonObj = null;
+            } catch(e) { currentRightJsonObj = null; }
+        }
+        function escapeHtml(s) { return s.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+        function processClean() {
+            let leftRaw = leftEditor.innerText || leftEditor.textContent;
+            if(!leftRaw.trim()) { showToast("左侧没有JSON数据", true); return; }
+            try {
+                const leftObj = JSON.parse(leftRaw);
+                const transformed = transformStructure(leftObj);
+                const rightStr = getPretty(transformed);
+                rightEditor.innerText = rightStr;
+                currentRightJsonObj = transformed;
+                updateBothLineNumbers();
+                let cnt=0;
+                JSON.stringify(transformed, (k,v) => { if(k==='value' && v==="") cnt++; return v; });
+                statsLabel.innerText = `✅ 已清空 ${cnt} 处value`;
+                diffStatusSpan.innerText = "差异: 手动查看 (点击「差异高亮」)";
+                showToast("结构清理完成，可编辑右侧JSON");
+            } catch(e) { showToast(`JSON解析错误: ${e.message}`, true); }
+        }
+        function formatLeftEditor() {
+            try {
+                let obj = JSON.parse(leftEditor.innerText);
+                leftEditor.innerText = getPretty(obj);
+                updateBothLineNumbers();
+                showToast("左侧格式化完成");
+            } catch(e) { showToast("左侧JSON无效", true); }
+        }
+        function formatRightEditor() {
+            try {
+                let obj = JSON.parse(rightEditor.innerText);
+                rightEditor.innerText = getPretty(obj);
+                updateBothLineNumbers();
+                updateRightCacheFromEditor();
+                diffStatusSpan.innerText = "差异: 手动查看";
+                showToast("右侧格式化完成");
+            } catch(e) { showToast("右侧JSON无效", true); }
+        }
+        function computeDiffHighlight() {
+            const leftRaw = leftEditor.innerText || leftEditor.textContent;
+            const rightRaw = rightEditor.innerText || rightEditor.textContent;
+            if(!leftRaw || !rightRaw) { diffStatusSpan.innerText = "差异: 无数据"; return; }
+            const leftArr = leftRaw.split('\n');
+            const rightArr = rightRaw.split('\n');
+            const maxLen = Math.max(leftArr.length, rightArr.length);
+            let diffCount = 0;
+            for(let i=0;i<maxLen;i++) {
+                if((leftArr[i]||'') !== (rightArr[i]||'')) diffCount++;
+            }
+            diffStatusSpan.innerText = `差异行数: ${diffCount} (行级对比)`;
+            let rightHtml = '';
+            for(let i=0;i<rightArr.length;i++) {
+                let cls='';
+                let l = leftArr[i]||'';
+                let r = rightArr[i]||'';
+                if(l !== r) {
+                    if(l === '') cls='diff-added';
+                    else if(r === '') cls='diff-removed';
+                    else cls='diff-changed';
+                }
+                rightHtml += `<div class="${cls}" style="white-space:pre-wrap;">${escapeHtml(r === '' ? ' ' : r)}</div>`;
+            }
+            rightEditor.innerHTML = rightHtml;
+            let leftHtml = '';
+            for(let i=0;i<leftArr.length;i++) {
+                leftHtml += `<div style="white-space:pre-wrap;">${escapeHtml(leftArr[i]===''?' ':leftArr[i])}</div>`;
+            }
+            leftEditor.innerHTML = leftHtml;
+            showToast("高亮显示完成，编辑将恢复纯文本");
+        }
+        function loadJsonFile(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    leftEditor.innerText = getPretty(json);
+                    updateBothLineNumbers();
+                    showToast(`已加载 ${file.name}`);
+                } catch(err) { showToast("文件解析失败", true); }
+            };
+            reader.readAsText(file);
+        }
+        function exportJson() {
+            const content = rightEditor.innerText || rightEditor.textContent;
+            if(!content || content.startsWith("//")){ showToast("没有有效结果", true); return; }
+            const blob = new Blob([content], {type:"application/json"});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = "processed_config.json";
+            a.click();
+            URL.revokeObjectURL(blob);
+            showToast("导出成功");
+        }
+        function bindSync() {
+            const leftScroll = document.querySelector('#leftWrap .code-area');
+            const rightScroll = document.querySelector('#rightWrap .code-area');
+            if(!leftScroll || !rightScroll) return;
+            let lock=false;
+            leftScroll.addEventListener('scroll', () => { if(syncEnabled && !lock) { lock=true; rightScroll.scrollTop = leftScroll.scrollTop; lock=false; } });
+            rightScroll.addEventListener('scroll', () => { if(syncEnabled && !lock) { lock=true; leftScroll.scrollTop = rightScroll.scrollTop; lock=false; } });
+        }
+        function buildVisualFormFromJson(jsonObj) {
+            if(!jsonObj || !jsonObj.ids) return "<div>⚠️ 右侧JSON缺少 ids 字段</div>";
+            let html = "";
+            for(let idx=0; idx<jsonObj.ids.length; idx++) {
+                const entry = jsonObj.ids[idx];
+                const adId = entry.id || `unknown_${idx}`;
+                const adsList = entry.ads || [];
+                html += `<div class="ad-card"><div class="card-title">📌 广告位 ID: ${adId}</div>`;
+                for(let j=0; j<adsList.length; j++) {
+                    const group = adsList[j];
+                    if(Array.isArray(group)) {
+                        for(let k=0; k<group.length; k++) {
+                            const adConfig = group[k];
+                            if(adConfig && adConfig.hasOwnProperty('value')) {
+                                const source = adConfig.source || "Admob";
+                                const priority = adConfig.priority;
+                                const currentVal = adConfig.value || "";
+                                const path = `${idx}-${j}-${k}`;
+                                html += `<div class="source-row">
+                                    <span class="source-badge">[${source}] priority=${priority}</span>
+                                    <input type="text" class="vis-value-input" data-path="${path}" placeholder="广告单元ID" value="${escapeHtml(currentVal)}" style="flex:2;">
+                                </div>`;
+                            }
+                        }
+                    }
+                }
+                html += `</div>`;
+            }
+            return html;
+        }
+        function refreshVisual() {
+            updateRightCacheFromEditor();
+            if(!currentRightJsonObj) { visualContainer.innerHTML = "<div>请先执行「结构清理+排序」生成右侧JSON</div>"; return; }
+            visualContainer.innerHTML = buildVisualFormFromJson(currentRightJsonObj);
+        }
+        function applyVisualToJson() {
+            if(!currentRightJsonObj) { showToast("没有右侧JSON数据", true); return; }
+            const inputs = document.querySelectorAll('#visualContainer .vis-value-input');
+            inputs.forEach(inp => {
+                const path = inp.getAttribute('data-path');
+                const newVal = inp.value;
+                if(!path) return;
+                const [idx, j, k] = path.split('-').map(Number);
+                try {
+                    const target = currentRightJsonObj.ids[idx].ads[j][k];
+                    if(target && target.hasOwnProperty('value')) {
+                        target.value = newVal;
+                    }
+                } catch(e) {}
+            });
+            rightEditor.innerText = getPretty(currentRightJsonObj);
+            updateBothLineNumbers();
+            diffStatusSpan.innerText = "差异: 手动查看";
+            showToast("可视化表单值已应用到右侧JSON");
+        }
+        function exportCsvTemplate() {
+            updateRightCacheFromEditor();
+            if(!currentRightJsonObj || !currentRightJsonObj.ids) { showToast("无有效ids数据", true); return; }
+            const rows = [];
+            rows.push(["ad_id","source","priority","current_value","new_value"]);
+            for(let item of currentRightJsonObj.ids) {
+                const adId = item.id;
+                const adsArr = item.ads || [];
+                for(let group of adsArr) {
+                    if(Array.isArray(group)) {
+                        for(let cfg of group) {
+                            if(cfg.hasOwnProperty('value')) {
+                                rows.push([adId, cfg.source || "", cfg.priority, cfg.value, ""]);
+                            }
+                        }
+                    }
+                }
+            }
+            const csvContent = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+            const blob = new Blob(["\uFEFF" + csvContent], {type: "text/csv;charset=utf-8;"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = "ad_values_template.csv";
+            link.click();
+            URL.revokeObjectURL(blob);
+            showToast("CSV模板已导出，请填写 new_value 列");
+        }
+        function importCsvAndFill() { csvFileInput.click(); }
+        function handleCsvFile(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                const text = e.target.result;
+                const lines = text.split(/\r?\n/);
+                if(lines.length<2) { showToast("CSV至少含标题行", true); return; }
+                const headers = lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+                const newValueIdx = headers.findIndex(h=>h.toLowerCase() === 'new_value');
+                const adIdIdx = headers.findIndex(h=>h.toLowerCase() === 'ad_id');
+                const sourceIdx = headers.findIndex(h=>h.toLowerCase() === 'source');
+                if(newValueIdx===-1 || adIdIdx===-1) { showToast("CSV缺少 ad_id 或 new_value 列", true); return; }
+                const updates = [];
+                for(let i=1;i<lines.length;i++) {
+                    if(!lines[i].trim()) continue;
+                    const parts = lines[i].split(',').map(p=>p.replace(/^"|"$/g, '').trim());
+                    if(parts.length <= Math.max(adIdIdx, sourceIdx, newValueIdx)) continue;
+                    const adId = parts[adIdIdx];
+                    const source = sourceIdx !== -1 ? parts[sourceIdx] : '';
+                    const newVal = parts[newValueIdx];
+                    if(adId && newVal !== undefined) updates.push({adId, source, newVal});
+                }
+                if(updates.length===0) { showToast("没有有效的更新数据", true); return; }
+                cachedCsvData = updates;
+                let previewHtml = `<div>✅ 已解析 ${updates.length} 条更新：<br>`;
+                updates.forEach(u=>{ previewHtml += `ID: ${u.adId} | source: ${u.source||'全部'} → "${u.newVal}"<br>`; });
+                previewHtml += `</div><button id="confirmCsvFillBtn" style="margin-top:10px;">✍️ 点击应用这些更新到右侧JSON</button>`;
+                csvPreviewArea.innerHTML = previewHtml;
+                document.getElementById('confirmCsvFillBtn')?.addEventListener('click', ()=>{
+                    applyCsvUpdatesToJson(updates);
+                });
+                showToast("CSV解析完成，点击「应用更新」");
+            };
+            reader.readAsText(file, "UTF-8");
+        }
+        function applyCsvUpdatesToJson(updates) {
+    updateRightCacheFromEditor();
+    if(!currentRightJsonObj) { showToast("右侧无JSON", true); return; }
+    for(let upd of updates) {
+        if(currentRightJsonObj.ids) {
+            for(let item of currentRightJsonObj.ids) {
+                if(item.id === upd.adId && item.ads) {
+                    for(let group of item.ads) {
+                        if(Array.isArray(group)) {
+                            for(let cfg of group) {
+                                // 修复：CSV中source为空时，只匹配JSON中也没有source的项
+                                let matchSource = false;
+                                if (upd.source === '') {
+                                    // CSV没有指定source → 只匹配JSON中同样没有source字段的项
+                                    matchSource = (!cfg.source || cfg.source === '');
+                                } else {
+                                    // CSV指定了source → 精确匹配
+                                    matchSource = (cfg.source === upd.source);
+                                }
+                                if(matchSource && cfg.hasOwnProperty('value')) {
+                                    cfg.value = upd.newVal;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    rightEditor.innerText = getPretty(currentRightJsonObj);
+    updateBothLineNumbers();
+    diffStatusSpan.innerText = "差异: 手动查看";
+    showToast("CSV填充已应用到右侧JSON");
+    refreshVisual();
+    csvPreviewArea.innerHTML = "填充完成，可再次导出JSON或继续编辑。";
+}
+        function resetCsvView() {
+            updateRightCacheFromEditor();
+            if(currentRightJsonObj) csvPreviewArea.innerHTML = "已同步右侧数据，可重新导出模板。";
+            else csvPreviewArea.innerHTML = "无数据";
+        }
+        function handleRightEdit() {
+            if (rightEditor.innerHTML.includes('diff-')) {
+                const plain = rightEditor.innerText;
+                rightEditor.innerHTML = '';
+                rightEditor.innerText = plain;
+            }
+            updateLineNumbers(rightEditor, rightLines);
+            updateRightCacheFromEditor();
+            diffStatusSpan.innerText = "差异: 手动查看";
+        }
+        function handleLeftEdit() {
+            if (leftEditor.innerHTML.includes('diff-') || leftEditor.innerHTML.includes('div')) {
+                const plain = leftEditor.innerText;
+                leftEditor.innerHTML = '';
+                leftEditor.innerText = plain;
+            }
+            updateLineNumbers(leftEditor, leftLines);
+            diffStatusSpan.innerText = "差异: 手动查看";
+        }
+
+        // ---------- 校验脚本管理 ----------
+        const SCRIPT_STORAGE_KEY = 'ad_validator_script';
+        function saveScriptToStorage(code) {
+            localStorage.setItem(SCRIPT_STORAGE_KEY, code);
+        }
+        function loadScriptFromStorage() {
+            return localStorage.getItem(SCRIPT_STORAGE_KEY) || '';
+        }
+        function clearScriptStorage() {
+            localStorage.removeItem(SCRIPT_STORAGE_KEY);
+        }
+
+        function updateScriptStatusText() {
+            const code = loadScriptFromStorage();
+            if (code) {
+                scriptStatus.innerText = '校验脚本：已缓存 (可更新)';
+            } else {
+                scriptStatus.innerText = '校验脚本：未上传';
+            }
+        }
+
+        uploadScriptBtn.addEventListener('click', () => scriptFileInput.click());
+        scriptFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const code = ev.target.result;
+                saveScriptToStorage(code);
+                updateScriptStatusText();
+                showToast('校验脚本已缓存');
+            };
+            reader.readAsText(file);
+            scriptFileInput.value = '';
+        });
+
+        clearScriptBtn.addEventListener('click', () => {
+            clearScriptStorage();
+            updateScriptStatusText();
+            showToast('脚本缓存已清除');
+        });
+
+        // ---------- Pyodide 动态加载 ----------
+        function loadPyodideScript() {
+            return new Promise((resolve, reject) => {
+                if (typeof loadPyodide === 'function') {
+                    resolve();
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js";
+                script.onload = () => {
+                    if (typeof loadPyodide === 'function') {
+                        resolve();
+                    } else {
+                        reject(new Error('Pyodide 脚本加载后未定义 loadPyodide'));
+                    }
+                };
+                script.onerror = () => reject(new Error('Pyodide 脚本加载失败'));
+                document.head.appendChild(script);
+            });
+        }
+
+        async function initializePyodide() {
+            if (pyodideReady) return;
+            pyodideStatusDiv.innerText = 'Pyodide 加载中... (首次约需10秒)';
+            try {
+                await loadPyodideScript();
+                pyodideInstance = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/"
+                });
+                pyodideReady = true;
+                pyodideStatusDiv.innerText = 'Pyodide 已就绪';
+                runValidateBtn.disabled = false;
+            } catch (err) {
+                pyodideStatusDiv.innerText = 'Pyodide 加载失败: ' + err.message;
+                showToast('Pyodide 初始化失败', true);
+            }
+        }
+
+        initializePyodide();
+
+        // ---------- 校验 JSON 输入处理 ----------
+        uploadValidateJsonBtn.addEventListener('click', () => validateJsonFileInput.click());
+        validateJsonFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                validateJsonText.value = ev.target.result;
+                updateValidateLineNumbers();
+                showToast(`已加载 ${file.name}`);
+            };
+            reader.readAsText(file);
+            validateJsonFileInput.value = '';
+        });
+
+        // 格式化校验 JSON
+        formatValidateJsonBtn.addEventListener('click', () => {
+            const raw = validateJsonText.value.trim();
+            if (!raw) {
+                showToast('JSON 文本框为空', true);
+                return;
+            }
+            try {
+                const obj = JSON.parse(raw);
+                validateJsonText.value = JSON.stringify(obj, null, 4);
+                updateValidateLineNumbers();
+                showToast('格式化完成');
+            } catch (e) {
+                showToast('JSON 格式错误: ' + e.message, true);
+            }
+        });
+
+        // 压缩校验 JSON
+        compressValidateJsonBtn.addEventListener('click', () => {
+            const raw = validateJsonText.value.trim();
+            if (!raw) {
+                showToast('JSON 文本框为空', true);
+                return;
+            }
+            try {
+                const obj = JSON.parse(raw);
+                validateJsonText.value = JSON.stringify(obj);
+                updateValidateLineNumbers();
+                showToast('压缩完成');
+            } catch (e) {
+                showToast('JSON 格式错误: ' + e.message, true);
+            }
+        });
+
+        clearValidateJsonBtn.addEventListener('click', () => {
+            validateJsonText.value = '';
+            validateLineNumbers.innerHTML = '';
+            validateOutput.innerText = '';
+        });
+
+        // 监听文本输入更新行号
+        validateJsonText.addEventListener('input', updateValidateLineNumbers);
+
+        // ---------- 执行校验 ----------
+        async function runValidation() {
+            const scriptCode = loadScriptFromStorage();
+            if (!scriptCode) {
+                showToast('请先上传校验脚本', true);
+                return;
+            }
+            const jsonText = validateJsonText.value.trim();
+            if (!jsonText) {
+                showToast('请粘贴或上传 JSON', true);
+                return;
+            }
+            try {
+                JSON.parse(jsonText);
+            } catch (e) {
+                showToast('JSON 格式错误: ' + e.message, true);
+                return;
+            }
+
+            if (!pyodideReady) {
+                showToast('Pyodide 仍在加载，请稍候', true);
+                return;
+            }
+
+            validateOutput.innerText = '执行中...';
+            let output = '';
+            pyodideInstance.setStdout({
+                batched: (msg) => { output += msg + '\n'; }
+            });
+            pyodideInstance.setStderr({
+                batched: (msg) => { output += '[STDERR] ' + msg + '\n'; }
+            });
+
+            try {
+                pyodideInstance.FS.writeFile('ad_config.json', jsonText);
+                await pyodideInstance.runPythonAsync(scriptCode);
+                validateOutput.innerText = output || '脚本执行完成，无输出。';
+            } catch (err) {
+                validateOutput.innerText = output + '\n[错误] ' + err.message;
+            } finally {
+                pyodideInstance.setStdout({ batched: () => {} });
+                pyodideInstance.setStderr({ batched: () => {} });
+            }
+        }
+
+        runValidateBtn.addEventListener('click', runValidation);
+
+        // ---------- 标签页切换 ----------
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+                if(btn.dataset.tab === 'visual') refreshVisual();
+                if(btn.dataset.tab === 'csv') resetCsvView();
+                if(btn.dataset.tab === 'validate') {
+                    updateScriptStatusText();
+                    updateValidateLineNumbers();
+                    if (!pyodideReady) initializePyodide();
+                }
+            });
+        });
+
+        // 原有按钮绑定
+        processBtn.addEventListener('click', processClean);
+        formatLeftBtn.addEventListener('click', formatLeftEditor);
+        formatRightBtn.addEventListener('click', formatRightEditor);
+        loadJsonBtn.addEventListener('click', () => jsonFileInput.click());
+        jsonFileInput.addEventListener('change', e => { if(e.target.files[0]) loadJsonFile(e.target.files[0]); });
+        exportJsonBtn.addEventListener('click', exportJson);
+        toggleSyncBtn.addEventListener('click', () => { syncEnabled = !syncEnabled; toggleSyncBtn.innerText = syncEnabled ? "同步滚动开" : "同步滚动关"; showToast(syncEnabled?"同步开启":"同步关闭"); });
+        diffBtn.addEventListener('click', computeDiffHighlight);
+        refreshVisualBtn.addEventListener('click', refreshVisual);
+        applyVisualBtn.addEventListener('click', applyVisualToJson);
+        exportCsvBtn.addEventListener('click', exportCsvTemplate);
+        importCsvBtn.addEventListener('click', () => csvFileInput.click());
+        csvFileInput.addEventListener('change', e => { if(e.target.files[0]) handleCsvFile(e.target.files[0]); csvFileInput.value=''; });
+        applyCsvToJsonBtn.addEventListener('click', () => { if(cachedCsvData.length) applyCsvUpdatesToJson(cachedCsvData); else showToast("请先导入CSV", true); });
+        resetFromRightBtn.addEventListener('click', resetCsvView);
+
+        leftEditor.addEventListener('input', handleLeftEdit);
+        rightEditor.addEventListener('input', handleRightEdit);
+
+        setTimeout(() => { bindSync(); updateBothLineNumbers(); updateScriptStatusText(); updateValidateLineNumbers(); }, 200);
+    })();
+</script>
+</body>
+</html>
